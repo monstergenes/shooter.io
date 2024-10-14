@@ -13,5 +13,212 @@
     <div class="enemies"></div>
     <div class="power-ups"></div>
   </div>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+<p>Score: <span id="score">0</span></p>
+<p id="gameOver" style="display:none;">Game Over! Press F5 to restart.</p>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let score = 0;
+  let gameOver = false;
+
+  // Player object
+  const player = {
+    x: canvas.width / 2 - 25,
+    y: canvas.height - 60,
+    width: 50,
+    height: 50,
+    speed: 5,
+    dx: 0,
+    dy: 0
+  };
+// Update player position
+  function updatePlayer() {
+    player.x += player.dx;
+    player.y += player.dy;
+
+    // Boundary checking
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    if (player.y < 0) player.y = 0;
+    if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+  }
+
+  // Move player
+  function movePlayer(e) {
+    switch (e.key) {
+      case 'ArrowRight':
+        player.dx = player.speed;
+        break;
+      case 'ArrowLeft':
+        player.dx = -player.speed;
+        break;
+      case 'ArrowUp':
+        player.dy = -player.speed;
+        break;
+      case 'ArrowDown':
+        player.dy = player.speed;
+        break;
+    }
+  }
+
+  // Stop player movement
+  function stopPlayer(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      player.dx = 0;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      player.dy = 0;
+    }
+  }
+  
+  // Array to store bullets
+  const bullets = [];
+  const enemies = [];
+
+  // Create enemy object
+  function createEnemy() {
+    const size = 40;
+    const x = Math.random() * (canvas.width - size);
+    const speed = Math.random() * 2 + 1;
+    enemies.push({ x, y: -size, width: size, height: size, speed });
+  }
+
+  // Draw player
+  function drawPlayer() {
+    ctx.fillStyle = 'blue';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
+
+  // Draw bullet
+  function drawBullet(bullet) {
+    ctx.fillStyle = 'yellow';
+    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+  }
+
+  // Draw enemy
+  function drawEnemy(enemy) {
+    ctx.fillStyle = 'red';
+    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+  }
+
+  // Move player
+  function movePlayer() {
+    player.x += player.dx;
+    player.y += player.dy;
+
+    // Boundary checking
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+  }
+
+  // Fire bullet
+  function fireBullet() {
+    bullets.push({ x: player.x + player.width / 2 - 5, y: player.y, width: 10, height: 20, speed: 5 });
+  }
+
+  // Move bullets
+  function moveBullets() {
+    bullets.forEach((bullet, index) => {
+      bullet.y -= bullet.speed;
+      // Remove bullet if it goes off-screen
+      if (bullet.y < 0) {
+        bullets.splice(index, 1);
+      }
+    });
+  }
+
+  // Move enemies
+  function moveEnemies() {
+    enemies.forEach((enemy, index) => {
+      enemy.y += enemy.speed;
+
+      // Game over if enemy reaches the player
+      if (enemy.y + enemy.height > canvas.height) {
+        gameOver = true;
+        document.getElementById('gameOver').style.display = 'block';
+      }
+    });
+  }
+
+  // Check for collisions
+  function checkCollisions() {
+    enemies.forEach((enemy, enemyIndex) => {
+      bullets.forEach((bullet, bulletIndex) => {
+        if (
+          bullet.x < enemy.x + enemy.width &&
+          bullet.x + bullet.width > enemy.x &&
+          bullet.y < enemy.y + enemy.height &&
+          bullet.y + bullet.height > enemy.y
+        ) {
+          // Remove the enemy and bullet on collision
+          enemies.splice(enemyIndex, 1);
+          bullets.splice(bulletIndex, 1);
+          score += 10;
+          document.getElementById('score').innerText = score;
+        }
+      });
+    });
+  }
+
+  // Clear canvas
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Update game objects
+  function update() {
+    if (gameOver) return;
+
+    clearCanvas();
+
+    // Update player
+    drawPlayer();
+    movePlayer();
+
+    // Update and draw bullets
+    moveBullets();
+    bullets.forEach(drawBullet);
+
+    // Update and draw enemies
+    moveEnemies();
+    enemies.forEach(drawEnemy);
+
+    // Check for collisions
+    checkCollisions();
+
+    // Request next frame
+    requestAnimationFrame(update);
+  }
+
+  // Create enemies at intervals
+  setInterval(createEnemy, 1000);
+
+  // Event listeners for movement and shooting
+  document.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case 'ArrowRight':
+        player.dx = player.speed;
+        break;
+      case 'ArrowLeft':
+        player.dx = -player.speed;
+        break;
+      case ' ':
+        fireBullet();
+        break;
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      player.dx = 0;
+    }
+  });
+
+  // Start the game
+  update();
+                 </script>
 </body>
 </html>

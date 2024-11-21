@@ -3,18 +3,18 @@
 require_relative "lib/jekyll/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "jekyll"
+  spec.name = "shooter.io"
   spec.version = Jekyll::VERSION
-  spec.authors = ["TODO: Write your name"]
-  spec.email = ["TODO: Write your email address"]
+  spec.authors = ["TODO: monstergenes"]
+  spec.email = ["100237939+monstergenes@users.noreply.github.com"]
 
-  spec.summary = "TODO: Write a short summary, because RubyGems requires one."
-  spec.description = "TODO: Write a longer description or delete this line."
+  spec.summary = ""A thrilling 3D space shooting game built with HTML, CSS, JavaScript, and WebGL."
+  spec.description = "3D Space Shooter is a web-based game that showcases stunning 3D graphics using WebGL, providing an immersive intergalactic combat experience. The game is powered by modern web technologies including HTML, CSS, and JavaScript, and features responsive controls, dynamic environments, and challenging gameplay. Perfect for showcasing the potential of web development in gaming"
   spec.homepage = "TODO: Put your gem's website or public repo URL here."
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"
 
-  spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
+  spec.metadata["allowed_push_host"] = "https://monstergenes.github.io/shooter.io/"
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "TODO: Put your gem's public repo URL here."

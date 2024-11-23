@@ -1,217 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js" />
-     <script src="ttps://cdn.jsdelivr.net/npm/three/examples/jsm/loaders/FBXLoader.js" />
-        <title>Advanced 3D Space Shooter</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-        #score, #gameOver, #level {
-            position: absolute;
-            color: white;
-            font-size: 24px;
-            z-index: 10;
-            text-align: center;
-            width: 100%;
-        }
-        #gameOver {
-            top: 50%;
-            display: none;
-            color: red;
-        }
-        #score { top: 10px; }
-        #level { top: 40px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruby Space Shooting Game</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: black;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      border: 1px solid white;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+      z-index: 2;
+    }
+  </style>
 </head>
 <body>
-    <div id="score">Score: 0</div>
-    <div id="level">Level: 1</div>
-    <div id="gameOver">Game Over</div>
-    <script type="module">
-        import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
-        import { FBXLoader } from 'https://cdn.jsdelivr.net/npm/three/examples/jsm/loaders/FBXLoader.js';
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas" width="640" height="480"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-        let score = 0;
-        let level = 1;
-        let gameOver = false;
+    const ws = new WebSocket("ws://localhost:4567");
 
-        // Scene, camera, and renderer setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+    let score = 0;
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        scene.add(ambientLight);
+    ws.onmessage = (message) => {
+      const data = JSON.parse(message.data);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(5, 5, 5).normalize();
-        scene.add(directionalLight);
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // FBX Loader
-        const loader = new FBXLoader();
+      // Draw player
+      ctx.fillStyle = "green";
+      ctx.fillRect(data.player.x, data.player.y, 20, 20);
 
-        // Player spaceship
-        let player;
-        let playerModelPath = 'assets/player/Destroyer_01.fbx'; // Change path based on upgrades
-        let playerSpeed = 0.2;
+      // Draw bullets
+      data.bullets.forEach((bullet) => {
+        ctx.fillStyle = "yellow";
+        ctx.fillRect(bullet.x, bullet.y, 5, 10);
+      });
 
-        loader.load(playerModelPath, (object) => {
-            player = object;
-            player.scale.set(0.01, 0.01, 0.01);
-            player.position.set(0, -3, -10);
-            scene.add(player);
-        });
+      // Draw enemies
+      data.enemies.forEach((enemy) => {
+        ctx.fillStyle = "red";
+        ctx.fillRect(enemy.x, enemy.y, 20, 20);
+      });
 
-        // Sounds
-        const shootSound = new Audio('path_to_shoot_sound.mp3');
-        const explosionSound = new Audio('path_to_explosion_sound.mp3');
-        const upgradeSound = new Audio('path_to_upgrade_sound.mp3');
+      // Update score
+      score = data.score;
+      document.getElementById('score').textContent = `Score: ${score}`;
+    };
 
-        // Arrays for bullets and enemies
-        const bullets = [];
-        const enemies = [];
-        let enemyModelPath = 'assets/enemy/Corvette_03.fbx';
+    window.addEventListener('keydown', (e) => {
+      ws.send(JSON.stringify({ action: "keydown", key: e.key }));
+    });
 
-        // Explosion particle system
-        const explosionParticles = [];
-        const particleGeometry = new THREE.BufferGeometry();
-        const particleMaterial = new THREE.PointsMaterial({ size: 0.1, color: 0xff0000 });
-
-        // Add particles for explosion
-        function addExplosion(position) {
-            const positions = [];
-            for (let i = 0; i < 100; i++) {
-                positions.push(position.x + Math.random() - 0.5);
-                positions.push(position.y + Math.random() - 0.5);
-                positions.push(position.z + Math.random() - 0.5);
-            }
-            particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            const particles = new THREE.Points(particleGeometry, particleMaterial);
-            scene.add(particles);
-            explosionParticles.push(particles);
-
-            // Remove particles after some time
-            setTimeout(() => {
-                scene.remove(particles);
-                explosionParticles.splice(explosionParticles.indexOf(particles), 1);
-            }, 1000);
-        }
-
-        // Bullet model
-        let bulletModelPath = 'assets/27.png';
-
-        function fireBullet() {
-            loader.load(bulletModelPath, (object) => {
-                const bullet = object.clone();
-                bullet.scale.set(0.005, 0.005, 0.005);
-                bullet.position.set(player.position.x, player.position.y, player.position.z);
-                bullets.push(bullet);
-                scene.add(bullet);
-                shootSound.play();
-            });
-        }
-
-        // Create a new enemy
-        function createEnemy() {
-            loader.load(enemyModelPath, (object) => {
-                const enemy = object.clone();
-                enemy.scale.set(0.01, 0.01, 0.01);
-                enemy.position.set((Math.random() - 0.5) * 10, 3, -15);
-                enemies.push(enemy);
-                scene.add(enemy);
-            });
-        }
-
-        // Movement and controls
-        const keys = {};
-        document.addEventListener('keydown', (e) => keys[e.key] = true);
-        document.addEventListener('keyup', (e) => keys[e.key] = false);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === ' ') fireBullet();
-        });
-
-        function movePlayer() {
-            if (!player) return;
-            if (keys['ArrowLeft'] && player.position.x > -5) player.position.x -= playerSpeed;
-            if (keys['ArrowRight'] && player.position.x < 5) player.position.x += playerSpeed;
-            if (keys['ArrowUp'] && player.position.y < 0) player.position.y += playerSpeed;
-            if (keys['ArrowDown'] && player.position.y > -5) player.position.y -= playerSpeed;
-        }
-
-        // Move bullets and enemies
-        function moveBullets() {
-            bullets.forEach((bullet, index) => {
-                bullet.position.z -= 0.5;
-                if (bullet.position.z < -50) {
-                    scene.remove(bullet);
-                    bullets.splice(index, 1);
-                }
-            });
-        }
-
-        function moveEnemies() {
-            enemies.forEach((enemy, index) => {
-                enemy.position.z += 0.1;
-                if (enemy.position.z > 0) {
-                    gameOver = true;
-                    document.getElementById('gameOver').style.display = 'block';
-                }
-            });
-        }
-
-        // Check collisions
-        function checkCollisions() {
-            enemies.forEach((enemy, enemyIndex) => {
-                bullets.forEach((bullet, bulletIndex) => {
-                    if (bullet.position.distanceTo(enemy.position) < 0.5) {
-                        scene.remove(enemy);
-                        scene.remove(bullet);
-                        enemies.splice(enemyIndex, 1);
-                        bullets.splice(bulletIndex, 1);
-                        addExplosion(enemy.position);
-                        explosionSound.play();
-                        score += 10;
-                        document.getElementById('score').innerText = `Score: ${score}`;
-                    }
-                });
-            });
-        }
-
-        // Upgrade logic
-        function checkUpgrades() {
-            if (score >= level * 100) {
-                level++;
-                document.getElementById('level').innerText = `Level: ${level}`;
-                upgradeSound.play();
-                playerModelPath = `assets/player/Destroyer_04${level2}.fbx`; // Update player model
-                bulletModelPath = `assets/29${level}.png`, `assets/52${level4}.png`, `assets/55${level2}.png`, `assets/66${level3}.png`; // Update bullet model
-            }
-        }
-
-        // Game loop
-        function animate() {
-            if (gameOver) return;
-
-            requestAnimationFrame(animate);
-            movePlayer();
-            moveBullets();
-            moveEnemies();
-            checkCollisions();
-            checkUpgrades();
-            renderer.render(scene, camera);
-        }
-
-        // Spawn enemies
-        setInterval(createEnemy, 2000);
-
-        // Start game
-        animate();
-    </script>
+    window.addEventListener('keyup', (e) => {
+      ws.send(JSON.stringify({ action: "keyup", key: e.key }));
+    });
+  </script>
 </body>
 </html>

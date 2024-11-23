@@ -1,202 +1,176 @@
-# frozen_string_literal: true
 
-require_relative "jekyll/version"
+require 'gosu'
+require 'opengl'
+include OpenGL
 
-module Jekyll
-  class Error < StandardError; end
-  require 'gosu'
-
-  class GameWindow < Gosu::Window
-    def initialize
-      super(640, 480)
-      self.caption = "Space Shooting Game"
-      @background_image = Gosu::Image.new("background.png", tileable: true)
-  
-      @player = Player.new
-      @player.warp(320, 240)
-  
-      @bullets = []
-      @enemies = []
-      @font = Gosu::Font.new(20)
-      @score = 0
-    end
-  
-    def update
-      if rand(100) < 4 && @enemies.size < 5
-        @enemies.push(Enemy.new)
-      end
-  
-      @player.move_left if Gosu.button_down? Gosu::KB_LEFT
-      @player.move_right if Gosu.button_down? Gosu::KB_RIGHT
-      @player.move_up if Gosu.button_down? Gosu::KB_UP
-      @player.move_down if Gosu.button_down? Gosu::KB_DOWN
-  
-      @player.shoot(@bullets) if Gosu.button_down? Gosu::KB_SPACE
-  
-      @bullets.each do |bullet|
-        bullet.move
-        @enemies.each do |enemy|
-          if enemy.collide?(bullet)
-            @score += 10
-            @enemies.delete(enemy)
-            @bullets.delete(bullet)
-            break
-          end
-        end
-      end
-  
-      @enemies.each do |enemy|
-        if enemy.collide?(@player)
-          initialize
-          break
-        end
-        enemy.move
-      end
-    end
-  
-    def draw
-      @background_image.draw(0, 0, 0)
-      @player.draw
-      @bullets.each(&:draw)
-      @enemies.each(&:draw)
-      @font.draw("Score: #{@score}", 10, 10, 1, 1.0, 1.0, Gosu::Color::WHITE)
-    end
-  end
-  
-  class Player
-    def initialize
-      @image = Gosu::Image.new("player.png")
-      @x = @y = @vel_x = @vel_y = 0.0
-      @score = 0
-    end
-  
-    def warp(x, y)
-      @x, @y = x, y
-    end
-  
-    def move_left
-      @vel_x -= 5
-    end
-  
-    def move_right
-      @vel_x += 5
-    end
-  
-    def move_up
-      @vel_y -= 5
-    end
-  
-    def move_down
-      @vel_y += 5
-    end
-  
-    def shoot(bullets)
-      bullets.push(Bullet.new(@x + 25, @y))
-    end
-  
-    def draw
-      @image.draw(@x, @y, 1)
-    end
-  end
-  
-  class Bullet
-    def initialize(x, y)
-      @image = Gosu::Image.new("bullet.png")
-      @x, @y = x, y
-    end
-  
-    def move
-      @y -= 10
-    end
-  
-    def draw
-      @image.draw(@x, @y, 1)
-    end
-  end
-  
-  class Enemy
-    def initialize
-      @image = Gosu::Image.new("enemy.png")
-      @x = rand * 640
-      @y = 0
-    end
-  
-    def move
-      @y += 5
-    end
-  
-    def draw
-      @image.draw(@x, @y, 1)
-    end
-  
-    def collide?(object)
-      Gosu.distance(object.x, object.y, @x, @y) < 50
-    end
-  end
-  
-  window = GameWindow.new
-  window.show
-  
-end
-class PowerUp
-  attr_reader :x, :y
-
-  def initialize
-    @image = Gosu::Image.new("powerup.png")
-    @x = rand * 640
-    @y = rand * 480
-    @timer = 5000  # Power-up effect duration in milliseconds (5 seconds)
-    @effect_active = false
-  end
-
-  def draw
-    @image.draw(@x, @y, 1)
-  end
-
-  def apply_effect(player)
-    return if @effect_active
-    @effect_active = true
-    player.increase_shooting_speed
-    Thread.new do
-      sleep @timer / 1000.0
-      player.reset_shooting_speed
-      @effect_active = false
-    end
-  end
-
-  def collide?(object)
-    Gosu.distance(object.x, object.y, @x, @y) < 50
-  end
-end
 class GameWindow < Gosu::Window
   def initialize
-    # Existing initialization code...
+    super(640, 480)
+    self.caption = "3D Space Shooting Game"
 
+    # OpenGL setup
+    glEnable(GL_DEPTH_TEST) # Enable depth testing
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity
+    gluPerspective(45.0, width.to_f / height.to_f, 1.0, 1000.0)
+
+    @player = Player.new
+    @bullets = []
+    @enemies = []
     @power_ups = []
+    @score = 0
+    @font = Gosu::Font.new(20)
   end
 
   def update
-    # Existing update code...
+    # Handle player movement
+    @player.move_left if Gosu.button_down? Gosu::KB_LEFT
+    @player.move_right if Gosu.button_down? Gosu::KB_RIGHT
+    @player.move_up if Gosu.button_down? Gosu::KB_UP
+    @player.move_down if Gosu.button_down? Gosu::KB_DOWN
+    @player.shoot(@bullets) if Gosu.button_down? Gosu::KB_SPACE
 
-    # Power-up spawning
-    if rand(1000) < 2 && @power_ups.empty?
-      @power_ups.push(PowerUp.new)
+    # Update bullets and check collisions
+    @bullets.each(&:move)
+    @bullets.reject! { |bullet| bullet.off_screen? }
+
+    # Spawn enemies
+    @enemies.push(Enemy.new) if rand(100) < 4 && @enemies.size < 5
+    @enemies.each(&:move)
+
+    # Check collisions between bullets and enemies
+    @bullets.each do |bullet|
+      @enemies.each do |enemy|
+        if enemy.collide?(bullet)
+          @score += 10
+          @enemies.delete(enemy)
+          @bullets.delete(bullet)
+          break
+        end
+      end
     end
 
-    # Player collecting power-up
-    @power_ups.each do |power_up|
-      if power_up.collide?(@player)
-        power_up.apply_effect(@player)
-        @power_ups.delete(power_up)
+    # Check collisions between player and enemies
+    @enemies.each do |enemy|
+      if enemy.collide?(@player)
+        reset_game
         break
       end
     end
   end
 
   def draw
-    # Existing draw code...
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity
+    gluLookAt(0, 0, 400, 0, 0, 0, 0, 1, 0) # Camera position
 
-    @power_ups.each(&:draw)
+    # Draw objects
+    @player.draw
+    @bullets.each(&:draw)
+    @enemies.each(&:draw)
+
+    # Display score
+    glDisable(GL_DEPTH_TEST)
+    @font.draw_text("Score: #{@score}", 10, 10, 1, 1.0, 1.0, Gosu::Color::WHITE)
+    glEnable(GL_DEPTH_TEST)
+  end
+
+  def reset_game
+    initialize
   end
 end
 
+class Player
+  attr_reader :x, :y, :z
+
+  def initialize
+    @x = @y = 0
+    @z = 0
+    @size = 20
+  end
+
+  def move_left
+    @x -= 5
+  end
+
+  def move_right
+    @x += 5
+  end
+
+  def move_up
+    @y += 5
+  end
+
+  def move_down
+    @y -= 5
+  end
+
+  def shoot(bullets)
+    bullets.push(Bullet.new(@x, @y, @z - 10))
+  end
+
+  def draw
+    glPushMatrix
+    glTranslate(@x, @y, @z)
+    glColor3f(0.0, 1.0, 0.0)
+    glutSolidCube(@size)
+    glPopMatrix
+  end
+end
+
+class Bullet
+  attr_reader :x, :y, :z
+
+  def initialize(x, y, z)
+    @x, @y, @z = x, y, z
+    @speed = 10
+  end
+
+  def move
+    @z -= @speed
+  end
+
+  def off_screen?
+    @z < -400
+  end
+
+  def draw
+    glPushMatrix
+    glTranslate(@x, @y, @z)
+    glColor3f(1.0, 1.0, 0.0)
+    glutSolidSphere(5, 10, 10)
+    glPopMatrix
+  end
+end
+
+class Enemy
+  attr_reader :x, :y, :z
+
+  def initialize
+    @x = rand(-300..300)
+    @y = rand(-200..200)
+    @z = 300
+    @size = 30
+  end
+
+  def move
+    @z -= 5
+  end
+
+  def collide?(object)
+    Gosu.distance(object.x, object.y, @x, @y) < 30 && (@z - object.z).abs < 30
+  end
+
+  def draw
+    glPushMatrix
+    glTranslate(@x, @y, @z)
+    glColor3f(1.0, 0.0, 0.0)
+    glutSolidCube(@size)
+    glPopMatrix
+  end
+end
+
+# Start the game
+window = GameWindow.new
+window.show
